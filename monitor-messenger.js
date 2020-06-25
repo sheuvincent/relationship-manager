@@ -189,9 +189,11 @@ async function runSample() {
 
 
 // authenticate(SCOPES)
-//  .then(client => runSample(client))
-//  .catch(console.error);
 authorize(OAUTH2_APP_KEY_PATH, SCOPES, messenger_listener)
+//  .then(client => runSample(client)) // No need; we built messenger_listener as a callback to authorize
+//  .catch(console.error);
+
+
 
 
 
@@ -203,84 +205,182 @@ authorize(OAUTH2_APP_KEY_PATH, SCOPES, messenger_listener)
  * Facebook Messenger Listening/Handling *
  *****************************************/
 
-// 1. LOGIN TO FACEBOOK MESSENGER (complete)
-/*
-// 1a. Login and save to appstate.json (only for new instances)
-login({email: "FB_EMAIL", password: "FB_PASSWORD"}, (err, api) => {
-    if(err) return console.error(err);
-    fs.writeFileSync('appstate.json', JSON.stringify(api.getAppState()));
-*/
+function handleMessage(message) {
+  sheets.spreadsheets.values.get({
+    spreadsheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
+    range: 'Class Data!A2:E',
+  }, (err, res) => {
+    if (err) return console.log('The API returned an error: ' + err);
+    const rows = res.data.values;
+    if (rows.length) {
+      console.log('Name, Major:');
+      // Print columns A and E, which correspond to indices 0 and 4.
+      rows.map((row) => {
+        console.log(`${row[0]}, ${row[4]}`);
+      });
+    } else {
+      console.log('No data found.');
+    }
+  });
 
-// 1b. Login using existing appstate.json
+  /*
+  // seen message (not sent)
+  if (!message.senderID)
+    return
+
+  var messageBody = null
+
+  if (message.type != "message") {
+    return
+  }
+  else if (message.body !== undefined && message.body != "") {
+    messageBody = ": " + message.body
+  }
+
+  if (message.attachments.length == 0){
+    console.log("New message from " + message.senderID + (messageBody || unrenderableMessage))
+    globals.socket.emit('receive', {senderID: message.senderID, content: message.body})
+  }else {
+    var attachment = message.attachments[0]//only first attachment
+    var attachmentType = attachment.type.replace(/\_/g, " ")
+    console.log("New " + attachmentType + " from " + message.senderID + (messageBody || unrenderableMessage))
+    globals.socket.emit('receive', {senderID: message.senderID, content: "New " + attachmentType + " from " + message.body})
+  }
+
+  lastThread = message.threadID
+
+
+
+  if (event.isGroup) { 
+    // Handle Groups
+
+    if (event.senderID == api.getCurrentUserID()) {
+      // Handle DM from self
+
+    } else {
+      // Handle DM from other party
+    }
+
+  } else { 
+    // Handle DMs
+
+    if (event.senderID == api.getCurrentUserID()) {
+      // Handle DM from self
+
+      // TODO: Check if contact is being tracked.
+      // TODO: If so, Update spreadsheet with a message out from user to contact
+
+      console.log(event);
+    } else {
+      // TODO: Enable when handleMessage has been written.
+      // handleMessage(event);
+      // Handle DM from other party
+            
+      // TODO: Check if contact is being tracked.
+      // TODO: If so, Update spreadsheet with a message out from contact to user
+      console.log(event);
+    }
+  }
+  */
+}
+
+
+
+// 1. LOGIN TO FACEBOOK MESSENGER (complete)
+
+// For Facebook Messenger 2FA
+var rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+const login_credentials = {email: "vsheu@stanford.edu", password: "Shoe327#"}
+
 function messenger_listener(auth) {
   const sheets = google.sheets({version: 'v4', auth});
-  login({appState: JSON.parse(fs.readFileSync(MESSENGER_APP_STATE_PATH, 'utf8'))}, (err, api) => {
+  
+  // Setting up params
+  var params = {
+    selfListen: true,
+    listenEvents: false,
+    forceLogin: true,
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36"
+  };
 
+  // todo: loginoptions handle review recent logins
+
+  // 1a. Login and save to appstate.json (only for new instances)
+
+  login(login_credentials, params, (err, api) => {
+    // Handle 2FA TODO: Doesn't work
+    if(err) {
+      switch (err.error) {
+        case 'login-approval':
+          console.log('Enter 2-Factor Authentication code > ');
+          rl.on('line', (line) => {
+            err.continue(line);
+            rl.close();
+          });
+          break;
+
+        default:
+          console.error(err);
+        }
+
+        return;
+    }
+    // }
+
+    fs.writeFileSync(MESSENGER_APP_STATE_PATH, JSON.stringify(api.getAppState()));
+
+  
+  /*
+  // 1b. Login using existing appstate.json
+  login({appState: JSON.parse(fs.readFileSync(MESSENGER_APP_STATE_PATH, 'utf8'))}, (err, api) => {
+  */
     // 2. OPTIONS
     // OPTION: Enable to listen to events (joining/leaving a chat, title change etc…)
     // api.setOptions({listenEvents: true});
   
     // OPTION: Listen to messages from user as well
-    api.setOptions({selfListen: true})
+    /*
+    api.setOptions({
+      selfListen: true,
+      listenEvents: false
+    })
+    */
 
     // 3. LISTEN
     api.listenMqtt((err, event) => {
       if(err) return console.error(err);
 
-      // 4. HANDLE MESSAGES
       switch(event.type) {
         // If message,
         case "message":
-          /*
+          // Marks messages as read immediately after they're received
+          api.markAsRead(event.threadID);
+
+          // Process end condition
           if(event.body === '/stop') {
             api.sendMessage("Goodbye…", event.threadID);
             return stopListening();
           }
-          api.sendMessage("TEST BOT: " + event.body, event.threadID);
-            break;
-          */
 
-        
-          if (event.isGroup) { 
-            // Handle Groups
-
-            if (event.senderID == api.getCurrentUserID()) {
-              // Handle DM from self
-
-            } else {
-              // Handle DM from other party
-
-            }
-
-          } else { 
-            // Handle DMs
-
-            if (event.senderID == api.getCurrentUserID()) {
-              // Handle DM from self
-
-              // TODO: Check if contact is being tracked.
-              // TODO: If so, Update spreadsheet with a message out from user to contact
-
-              console.log(event);
-            } else {
-              // Handle DM from other party
-            
-              // TODO: Check if contact is being tracked.
-              // TODO: If so, Update spreadsheet with a message out from contact to user
-              console.log(event);
-              console.log(event);
-            }
-          }
+          // All other processing
+          handleMessage(event, auth);
 
           break;
-          
-        // Else if event, no need to do anything
+
         case "event":
+          // Else if event, no need to do anything
           console.log(event);
           break;
-      }         
-    });
-  });
+      }
+
+
+                  
+    }); // api.listenMqtt()
+  }); // login()
 }
 
 

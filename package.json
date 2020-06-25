@@ -3,9 +3,6 @@
   "version": "1.0.0",
   "description": "",
   "main": "monitor-messenger.js",
-  "engines": {
-    "node": "12.18.1"
-  }
   "dependencies": {
     "facebook-chat-api": "^1.8.0",
     "googleapis": "^52.1.0",
